@@ -10,80 +10,138 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 //Declare max clients
-const int MAX_CLIENTS = 5;
+const unsigned int MAX_CLIENTS = 5;
 
 //Then bind to the port that the server will be listening on.
 const unsigned short PORT = 1234;
 
+// Message Buffer Length
+const int BUFFER_SIZE = 512;
+
+enum Command { INVALID, UNAME, PM };
+
+struct CommandData
+{
+	CommandData(const Command& command, std::vector<std::string> parameters)
+	{
+		this->command = command;
+		this->parameters = parameters;
+	}
+
+	Command command;
+	std::vector<std::string> parameters;
+};
+
 //Checks to make use the message is valid by removing extra characters
 bool isMessageValid(const char* message)
 {
+	if(!strcmp("", message))
+		return false;
 	if (message[0] == '\r')
-	{
 		return false;
-	}
 	if (message[0] == '\n')
-	{
 		return false;
-	}
 	return true;
 }
 
+void disconnectUser(User &user, std::vector<User> &users)
+{
+	// Close the user's socket and flag it as invalid
+	closesocket(user.getSocket());
+	user.setSocket(INVALID_SOCKET);
+
+	// Build the message to send to other users and log it to the console
+	std::string message = "User #" + std::to_string(user.getID()) + " Disconnected.";
+	printf("%s\n", message.c_str());
+
+	// For each valid user that is connected, notify them of the user disconnecting
+	for (unsigned int i = 0; i < MAX_CLIENTS; ++i)
+	{
+		if (users[i].getSocket() != INVALID_SOCKET)
+		{
+			send(users[i].getSocket(), message.c_str(), message.length(), NULL);
+		}
+	}
+}
+
+CommandData getCommand(const std::string& message)
+{
+	std::vector<std::string> segments;
+	std::string current = "";
+	for(int i = 0; i < message.length(); ++i)
+	{
+		if (message[i] == ' ' && current != "")
+		{
+			segments.push_back(current);
+			current = "";
+			continue;
+		}
+
+		current += message[i];
+	}
+
+	if (segments.empty())
+		return CommandData(INVALID, segments);
+
+	std::string command = segments[0];
+	segments.erase(segments.begin());
+
+	if (command == "PM")
+		return CommandData(PM, segments);
+	if (command == "UNAME" && segments.size() >= 1)
+		return CommandData(UNAME, segments);
+
+	return CommandData(INVALID, segments);
+}
+
+void processCommand(User &user, std::vector<User> &users, const CommandData& commandData)
+{
+	if(commandData.command == PM)
+	{
+		std::cout << "Change User " + std::to_string(user.getID()) + "'s name to " + commandData.parameters[0] << std::endl;
+	}
+}
 
 int processClient(User &user, std::vector<User> &users, std::thread &thread)
 {
-	const int bufLen = 512;
-	char tempmsg[bufLen];
-	std::string msg = "";	
-
-	msg = "UNAME";
-	send(user.getSocket(), msg.c_str(), strlen(msg.c_str()), 0);
-
-	while (true) 
+	while(true)
 	{
-		memset(tempmsg, 0, bufLen);
-		int result = recv(user.getSocket(), tempmsg, bufLen, 0);
+		// Create a buffer to store the recieved data
+		char messageBuffer[BUFFER_SIZE] = { 0 };
 
-		if (result != SOCKET_ERROR)
-		{
-			if (strcmp("", tempmsg) && isMessageValid(tempmsg))
-			{
-				msg = "Client #" + std::to_string(user.getID()) + " : " + tempmsg;
-				for (int i = 0; i < MAX_CLIENTS; i++)
-				{
-					if (users[i].getSocket() != INVALID_SOCKET)
-					{
-						if (user.getID() != i)
-						{
-							result = send(users[i].getSocket(), msg.c_str(), strlen(msg.c_str()), 0);
-						}
-					}
-				}
-			}
-		}
-		else
-		{
-			msg = "Client #" + std::to_string(user.getID() + 1) + " disconnected";
-			printf("%s\n", msg.c_str());
+		// Wait for a message to be recieved
+		int status = recv(user.getSocket(), messageBuffer, BUFFER_SIZE, NULL);
 
-			for (int i = 0; i < MAX_CLIENTS; i++) 
-			{
-				if (users[i].getSocket() != INVALID_SOCKET) 
-				{
-					if (user.getID() != i)
-					{
-						result = send(users[i].getSocket(), msg.c_str(), strlen(msg.c_str()), 0);
-					}
-				}
-			}
-				
-			closesocket(user.getSocket());
-			closesocket(users[user.getID()].getSocket());
-			users[user.getID()].setSocket(INVALID_SOCKET);
+		// If there was an error, disconnect the user and detach the thread
+		if(status == SOCKET_ERROR)
+		{
+			disconnectUser(user, users);
 			thread.detach();
+			return -1;
+		}
+
+		// If the message is invalid, ignore it and continue
+		if(!isMessageValid(messageBuffer))
+			continue;
+
+		CommandData commandData = getCommand(std::string(messageBuffer));
+		if (commandData.command != INVALID)
+			processCommand(user, users, commandData);
+
+		// Build the message to send to other users and log it to the console
+		std::string message = "User #" + std::to_string(user.getID()) + ": " + std::string(messageBuffer);
+		printf("%s\n", message.c_str());
+
+		int sendersID = user.getID();
+		for (unsigned int i = 0; i < MAX_CLIENTS; ++i)
+		{
+			// Send the message to all valid users (that are not the sending user)
+			if (users[i].getSocket() != INVALID_SOCKET && users[i].getID() != sendersID)
+			{
+				send(users[i].getSocket(), message.c_str(), message.length(), NULL);
+			}
 		}
 	}
-	return 0;
 }
 
 //Start to adding main function 
