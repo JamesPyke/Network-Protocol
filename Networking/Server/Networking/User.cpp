@@ -10,6 +10,8 @@ User::User(int id, SOCKET socket)
 {
 	this->id = id;
 	this->socket = socket;
+	this->username = "User " + std::to_string(id);
+
 }
 
 int User::getID() const
@@ -25,4 +27,14 @@ SOCKET User::getSocket() const
 void User::setSocket(SOCKET socket) 
 {
 	this->socket = socket;
+}
+
+std::string User::getUsername() const
+{
+	return username;
+}
+
+void User::setUsername(const std::string& username)
+{
+	this->username = username;
 }

@@ -45,6 +45,7 @@
             this.TxtFeed.Size = new System.Drawing.Size(360, 211);
             this.TxtFeed.TabIndex = 0;
             this.TxtFeed.TabStop = false;
+            this.TxtFeed.TextChanged += new System.EventHandler(this.TxtFeed_TextChanged);
             // 
             // TxtMessage
             // 

@@ -70,5 +70,10 @@ namespace Client
 
             Application.Exit();
         }
+
+        private void TxtFeed_TextChanged(object sender, EventArgs e)
+        {
+
+        }
     }
 }

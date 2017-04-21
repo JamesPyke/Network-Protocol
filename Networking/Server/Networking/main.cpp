@@ -3,7 +3,6 @@
 #include <thread>
 #include <vector>
 #include <string>
-#include <algorithm>
 #include "User.h"
 
 //inlcude the ws2_32 library using pragma comment
@@ -17,6 +16,9 @@ const unsigned short PORT = 1234;
 
 // Message Buffer Length
 const int BUFFER_SIZE = 512;
+
+const unsigned int USERNAME_MIN_LENGTH = 3;
+const unsigned int USERNAME_MAX_LENGTH = 12;
 
 enum Command { INVALID, UNAME, PM };
 
@@ -42,6 +44,15 @@ bool isMessageValid(const char* message)
 	if (message[0] == '\n')
 		return false;
 	return true;
+}
+
+std::string toLower(std::string string)
+{
+	for(char& character : string)
+	{
+		character = towlower(character);
+	}
+	return string;
 }
 
 void disconnectUser(User &user, std::vector<User> &users)
@@ -70,7 +81,7 @@ CommandData getCommand(const std::string& message)
 	std::string current = "";
 	for(int i = 0; i < message.length(); ++i)
 	{
-		if (message[i] == ' ' && current != "")
+		if (message[i] == ' ' && !current.empty())
 		{
 			segments.push_back(current);
 			current = "";
@@ -78,17 +89,23 @@ CommandData getCommand(const std::string& message)
 		}
 
 		current += message[i];
+
+		if(i == message.length() - 1 && !current.empty())
+		{
+			segments.push_back(current);
+		}
+
 	}
 
 	if (segments.empty())
 		return CommandData(INVALID, segments);
 
-	std::string command = segments[0];
+	std::string command = toLower(segments[0]);
 	segments.erase(segments.begin());
 
-	if (command == "PM")
+	if (command == "pm" && segments.size() >= 2)
 		return CommandData(PM, segments);
-	if (command == "UNAME" && segments.size() >= 1)
+	if (command == "uname" && segments.size() >= 1)
 		return CommandData(UNAME, segments);
 
 	return CommandData(INVALID, segments);
@@ -96,9 +113,64 @@ CommandData getCommand(const std::string& message)
 
 void processCommand(User &user, std::vector<User> &users, const CommandData& commandData)
 {
-	if(commandData.command == PM)
+	Command commandType = commandData.command;
+
+	if(commandType == UNAME)
 	{
-		std::cout << "Change User " + std::to_string(user.getID()) + "'s name to " + commandData.parameters[0] << std::endl;
+		std::string desiredUsername = commandData.parameters[0];
+		unsigned int desiredUsernameLength = desiredUsername.length();
+		
+		if(desiredUsernameLength < USERNAME_MIN_LENGTH || desiredUsernameLength > USERNAME_MAX_LENGTH)
+		{
+			std::string response = "Username too long or short ";
+			send(user.getSocket(), response.c_str(), response.length(), NULL);
+			return;
+		}
+
+		std::string desiredUsernameLowered = toLower(desiredUsername);
+
+		for(unsigned int i = 0; i < users.size(); ++i)
+		{
+			std::string usersNameLowered = toLower(users[i].getUsername());
+			if(usersNameLowered == desiredUsernameLowered)
+			{
+				std::string response = "Username already exists ";
+				send(user.getSocket(), response.c_str(), response.length(), NULL);
+				return;
+			}
+		}
+		user.setUsername(desiredUsername);
+		printf("Set User %d's name to %s\n", user.getID(), desiredUsername.c_str());
+		std::string response = "Username set successfully ";
+		send(user.getSocket(), response.c_str(), response.length(), NULL);
+		return;
+	}
+
+	if(commandType == PM)
+	{
+		std::vector<std::string> parameters = commandData.parameters;
+
+		std::string targetUser = toLower(parameters.front());
+		parameters.erase(parameters.begin());
+
+		std::string message = "(PM) " + user.getUsername() + ": ";
+		for(std::string& item : parameters)
+		{
+			message += item + " ";
+		}
+
+		for(unsigned int i = 0; i < users.size(); ++i)
+		{	
+			std::string usersNameLowered = toLower(users[i].getUsername());
+			if(targetUser == usersNameLowered)
+			{
+				std::string response = "PM sent succesfully.";
+				send(user.getSocket(), response.c_str(), response.length(), NULL);
+
+				send(users[i].getSocket(), message.c_str(), message.length(), NULL);
+			}
+		}
+		return;
 	}
 }
 
@@ -126,17 +198,20 @@ int processClient(User &user, std::vector<User> &users, std::thread &thread)
 
 		CommandData commandData = getCommand(std::string(messageBuffer));
 		if (commandData.command != INVALID)
+		{
 			processCommand(user, users, commandData);
+			continue;
+		}
 
 		// Build the message to send to other users and log it to the console
-		std::string message = "User #" + std::to_string(user.getID()) + ": " + std::string(messageBuffer);
+		std::string message = user.getUsername() + ": " + std::string(messageBuffer);
 		printf("%s\n", message.c_str());
 
 		int sendersID = user.getID();
 		for (unsigned int i = 0; i < MAX_CLIENTS; ++i)
 		{
 			// Send the message to all valid users (that are not the sending user)
-			if (users[i].getSocket() != INVALID_SOCKET && users[i].getID() != sendersID)
+			if (users[i].getSocket() != INVALID_SOCKET)
 			{
 				send(users[i].getSocket(), message.c_str(), message.length(), NULL);
 			}
