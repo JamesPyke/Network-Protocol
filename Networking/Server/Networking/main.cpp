@@ -286,7 +286,7 @@ int main()
 	int size = sizeof(client);
 	std::string msg;
 
-	while (1)
+	while (true)
 	{
 		auto clientSock = accept(sock, reinterpret_cast<sockaddr *>(&client), &size);
 		if (clientSock == INVALID_SOCKET) continue;
@@ -342,7 +342,4 @@ int main()
 	WSACleanup();
 
 	return 0;
-
-
-
 }

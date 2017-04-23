@@ -42,7 +42,7 @@
             this.TxtFeed.Name = "TxtFeed";
             this.TxtFeed.ReadOnly = true;
             this.TxtFeed.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.TxtFeed.Size = new System.Drawing.Size(360, 211);
+            this.TxtFeed.Size = new System.Drawing.Size(607, 211);
             this.TxtFeed.TabIndex = 0;
             this.TxtFeed.TabStop = false;
             this.TxtFeed.TextChanged += new System.EventHandler(this.TxtFeed_TextChanged);
@@ -52,7 +52,7 @@
             this.TxtMessage.Location = new System.Drawing.Point(12, 229);
             this.TxtMessage.MaxLength = 1024;
             this.TxtMessage.Name = "TxtMessage";
-            this.TxtMessage.Size = new System.Drawing.Size(360, 20);
+            this.TxtMessage.Size = new System.Drawing.Size(607, 20);
             this.TxtMessage.TabIndex = 0;
             this.TxtMessage.KeyDown += new System.Windows.Forms.KeyEventHandler(this.TxtMessage_KeyDown);
             // 
@@ -64,7 +64,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(384, 260);
+            this.ClientSize = new System.Drawing.Size(631, 260);
             this.Controls.Add(this.TxtMessage);
             this.Controls.Add(this.TxtFeed);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
